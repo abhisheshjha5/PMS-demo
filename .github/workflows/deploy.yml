@@ -1,12 +1,9 @@
-name: Deploy Angular PMS to GitHub Pages
+name: Build & Deploy multi-client-demo to GitHub Pages
 
 on:
   push:
     branches:
       - master
-
-permissions:
-  contents: write  # Needed for pushing to the repo
 
 jobs:
   build-and-deploy:
@@ -14,39 +11,44 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18
 
       - name: Install dependencies
         run: npm ci
 
-      # Build each client
-      - name: Build Client1
-        run: npm run build:client1
-      - name: Build Client2
-        run: npm run build:client2
-      - name: Build Client3
-        run: npm run build:client3
-
-      # Move builds into docs/
-      - name: Prepare docs folder
+      - name: Build all clients
+        # run your existing build script or three builds
         run: |
+          npm run build:client1
+          npm run build:client2
+          npm run build:client3
+
+      - name: Clean old docs and create fresh folder
+        run: |
+          # remove old docs entirely, then re-create empty docs folder
+          rm -rf docs
           mkdir -p docs
+
+      - name: Move client builds into docs
+        run: |
+          # move built client folders into fresh docs
           mv dist/client1 docs/client1
           mv dist/client2 docs/client2
           mv dist/client3 docs/client3
 
-          # Create landing page
-          cat <<EOF > docs/index.html
+      - name: Create landing page (docs/index.html)
+        run: |
+          cat <<'EOF' > docs/index.html
           <!DOCTYPE html>
           <html>
           <head>
             <meta charset="utf-8">
-            <title>PMS Demo</title>
+            <title>Multi Client Demo</title>
             <style>
               body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
               h1 { color: #333; }
@@ -55,7 +57,7 @@ jobs:
             </style>
           </head>
           <body>
-            <h1>PMS Demo</h1>
+            <h1>Multi Client Demo</h1>
             <p>Select a client:</p>
             <a href="./client1/">Client 1</a>
             <a href="./client2/">Client 2</a>
@@ -64,11 +66,8 @@ jobs:
           </html>
           EOF
 
-      # Commit and push to master/docs
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs
-          git commit -m "Deploy to GitHub Pages" || echo "No changes to commit"
-          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }} master
+      - name: Deploy to GitHub Pages (publish docs/)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
